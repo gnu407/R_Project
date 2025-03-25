@@ -1,0 +1,28 @@
+---
+title: "Elias_PegelUrsprung_2025"
+format: html
+editor: visual
+---
+
+25.03.2025 v1 by Jakob Kniess
+
+# R Script to compare Partnach Gauge levels after  and before at Partnach Ursprung
+
+```{r}
+# Libraries
+```
+
+## CONFIG
+
+```{r}
+# Config Cell
+
+```
+
+## 1. Data Input
+
+```{r}
+# Data Input
+```
+
+# 
