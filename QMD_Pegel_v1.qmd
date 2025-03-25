@@ -6,10 +6,12 @@ editor: visual
 
 25.03.2025 v1 by Jakob Kniess
 
-# R Script to compare Partnach Gauge levels after  and before at Partnach Ursprung
+# R Script to compare Partnach Gauge levels after and before at Partnach Ursprung
 
 ```{r}
 # Libraries
+# library(usethis)
+# use_git()
 ```
 
 ## CONFIG
