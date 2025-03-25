@@ -8,23 +8,81 @@ editor: visual
 
 # R Script to compare Partnach Gauge levels after and before at Partnach Ursprung
 
+GitHub: follow this tutorial for everything else :)
+
+<https://www.youtube.com/playlist?list=PLSviU861UtD81AuyYb3SbndmAA_qTCoLe>
+
 ```{r}
-# Libraries
-# library(usethis)
-# use_git()
+# LIBRARIES
+library(dplyr)
+#install.packages("dplyr")
 ```
 
 ## CONFIG
 
 ```{r}
-# Config Cell
+# CONFIG
+path_ursprung =normalizePath("C:\\Users\\Jakob\\OneDrive - Universität Augsburg\\Job Uni\\G-MONARCH\\ONGOING\\Elias_PegelOffset_2025\\R_Projekt\\R_Project\\Daten\\Datensatz_Partnach_v1\\Partnach_Ursprung\\Abflüsse_nach_Jahren")
 
 ```
 
 ## 1. Data Input
 
 ```{r}
-# Data Input
+# DATA INPUT
+df_ursprung <- read_and_combine(path_ursprung)
 ```
 
-# 
+## 2. Functions
+
+```{r}
+# FUCTIONS
+
+# F1 - Read and combine files
+read_and_combine <- function(base_folder_path) {
+  
+  # List all CSV files that start with "Produkt_" in the year-based subfolders
+  files <- list.files(base_folder_path, pattern = "^Produkt_.*\\.csv$", full.names = TRUE, recursive = TRUE)
+  #print (files)
+  if (length(files) == 0) {
+    stop("No CSV files starting with 'Produkt_' found in the specified folder or its subfolders.")
+  }
+  
+  # Read and standardize the columns before binding
+  df_list <- lapply(files, function(file) {
+    df <- read.csv(file)
+    
+    # Ensure that all columns exist and convert all to character for consistency
+    df[] <- lapply(df, function(col) {
+      # Convert each column to character
+      col <- as.character(col)
+      
+      # Replace empty values with NaN (missing values should be converted to NaN)
+      col[col == ""] <- NA
+      
+      return(col)
+    })
+    
+    return(df)
+  })
+  
+  # Combine all data frames
+  combined_df <- bind_rows(df_list)
+  
+  return(combined_df)
+}
+
+#F2
+```
+
+```{r}
+
+df_ursprung
+
+```
+
+```{r}
+df_ursprung <- read_and_combine(path_ursprung)
+```
+
+df_ursprung \<- read_and_combine(path_ursprung)
