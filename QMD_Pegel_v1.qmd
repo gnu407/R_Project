@@ -157,26 +157,29 @@ df_bock_01 <- df_bock_00 %>%
 
 # Merge the dataframes based on MESS_DATUM, keeping only one MESS_DATUM column
 df_combined_01<- df_ursprung_01 %>%
-  left_join(df_bock_01, by = "MESS_DATUM", suffix = c("_Ursprung", "_Bock"))
+  left_join(df_bock_01, by = "Date", suffix = c("_Ursprung", "_Bock"))
 
 # CLEANUP - it got a bit dirty 
 # Remove unwanted columns and rename Date_Ursprung to MESS_DATUM
 df_combined_00 <- df_combined_01 %>%
-  select(-MESS_DATUM,   # Remove the redundant MESS_DATUM from df_bock_01
-         -Date_Bock) %>%      # Remove Date_Bock column
-  rename(MESS_DATUM = Date_Ursprung)  # Rename Date_Ursprung to MESS_DATUM
+  select(-MESS_DATUM_Ursprung,   # Remove the redundant MESS_DATUM from df_bock_01
+         -MESS_DATUM_Bock) %>%      # Remove Date_Bock column
+  rename(MESS_DATUM = Date)  # Rename Date_Ursprung to MESS_DATUM
 
+# Round to 3 decimal places
+df_combined_00[num_cols] <- round(df_combined_00[num_cols], 3)  # Round numeric columns to 2 decimal places
+  
 
 ```
 
 ## Plotting
 
-```{r}
-# Extract Year from MESS_DATUM column and add as a new column
+LEGACY
+// Extract Year from MESS_DATUM column and add as a new column
 df_combined_00 <- df_combined_00 %>%
   mutate(Year = as.numeric(format(MESS_DATUM, "%Y")))  # Extract year as numeric
 
-# Create the scatterplot with publication-quality formatting
+//Create the scatterplot with publication-quality formatting
 p <- ggplot(df_combined_00, aes(x = Q_Bock, y = Q_Ursprung, color = factor(Year))) +
   geom_point(alpha = 0.7, size = 2) +  # Scatterplot with semi-transparent points
   scale_colour_brewer(palette = "Paired") +  # Use a color scale (Viridis is colorblind-friendly)
@@ -194,60 +197,95 @@ p <- ggplot(df_combined_00, aes(x = Q_Bock, y = Q_Ursprung, color = factor(Year)
   ) +
   ggtitle("Scatter Plot of Q_Bock vs. Q_Ursprung")  # Add a title
 
-# Print the plot
+// Print the plot
 print(p)
-```
+
+
+
+
 ```{r}
+# PLOT - DISCHARGE
 # Extract Year from MESS_DATUM column and add as a new column
 df_combined_00 <- df_combined_00 %>%
   mutate(Year = as.numeric(format(MESS_DATUM, "%Y")))  # Extract year as numeric
 
 # Create the scatterplot with publication-quality formatting
-p <- ggplot(df_combined_00, aes(x = Q_Bock, y = Q_Ursprung, color = factor(Year))) +
-  geom_point(alpha = 0.7, size = 2) +  # Scatterplot with semi-transparent points
-  scale_colour_brewer(palette = "Paired") +  # Use a color scale (Viridis is colorblind-friendly)
-  labs(x = "Q Bock", y = "Q Ursprung", color = "Year") +  # Axis labels and legend title
-  theme_minimal(base_size = 14) +  # Minimal theme with a bigger base font size
-  theme(
-    legend.position = "right",  # Position the legend to the right
-    legend.title = element_text(size = 14, face = "bold"),
-    legend.text = element_text(size = 12),
-    axis.title = element_text(size = 14, face = "bold"),
-    axis.text = element_text(size = 12),
-    plot.title = element_text(size = 16, face = "bold", hjust = 0.5)  # Title
-  ) +
-  ggtitle("Scatter Plot of Q_Bock vs. Q_Ursprung") +  # Add a title
-  coord_fixed(ratio = 1)  # Ensure the x and y axes have the same scale
-
-# Print the plot
-print(p)
-```
-
-
-```{r}
-
-# Extract Year from MESS_DATUM column and add as a new column
-df_combined_00 <- df_combined_00 %>%
-  mutate(Year = as.numeric(format(MESS_DATUM, "%Y")))  # Extract year as numeric
-
-# Create the scatterplot with publication-quality formatting
-p <- ggplot(df_combined_00, aes(x = Q_Bock, y = Q_Ursprung, color = factor(Year), text = paste("Year: ", Year))) +
+p <- ggplot(df_combined_00, aes(x = Q_Bock, y = Q_Ursprung, color = factor(Year), text = paste("Year: ", Year, "<br>Q Bockhütte: ", Q_Bock, " m³", 
+                                            "<br>Q Partnach-Ursprung: ", Q_Ursprung, " m³"))) +
   geom_point(alpha = 0.7, size = 2) +  # Scatterplot with semi-transparent points
   scale_colour_brewer(palette = "Paired") +  # Use a color scale
-  labs(x = "Q Bock", y = "Q Ursprung", color = "Year") +  # Axis labels and legend title
+  labs(x = "Q Bockhütte [m³]", y = "Q Partnach-Ursprung [m³]", color = "Year") +  # Axis labels and legend title
   theme_minimal(base_size = 14) +  # Minimal theme with a bigger base font size
   theme(
     legend.position = "right",  # Position the legend to the right
-    legend.title = element_text(size = 14, face = "bold"),
+    legend.title = element_text(size = 14, face = "normal"),
     legend.text = element_text(size = 12),
-    axis.title = element_text(size = 14, face = "bold"),
+    axis.title = element_text(size = 14, face = "normal"),
     axis.text = element_text(size = 12),
-    plot.title = element_text(size = 16, face = "bold", hjust = 0.5)  # Title
+    plot.title = element_text(size = 12, face = "bold", hjust = 0.5)  # Title
   ) +
-  ggtitle("Scatter Plot of Q_Bock vs. Q_Ursprung")
+  ggtitle("Plot of average daily discharge at Bockhütte and Partnach-Ursprung")
 
 # Convert the ggplot object to a plotly object for interactivity
 interactive_plot <- ggplotly(p, tooltip = "text")  # Tooltip shows the year when hovering over the points
+
+# Display the interactive plot
+interactive_plot
+```
+
+```{r}
+
+# PLOT - WATERLEVEL
+# Extract Year from MESS_DATUM column and add as a new column
+df_combined_00 <- df_combined_00 %>%
+  mutate(Year = as.numeric(format(MESS_DATUM, "%Y")))  # Extract year as numeric
+
+# Create the scatterplot with publication-quality formatting
+p <- ggplot(df_combined_00, aes(x = P_D_W_Bock, y = P_D_W_Ursprung, color = factor(Year), text = paste("Year: ", Year, "<br>Q Bockhütte: ", Q_Bock, " m³", 
+                                            "<br>Q Partnach-Ursprung: ", Q_Ursprung, " m³"))) +
+  geom_point(alpha = 0.7, size = 2) +  # Scatterplot with semi-transparent points
+  scale_colour_brewer(palette = "Dark2") +  # Use a color scale
+  labs(x = "Waterlevel Bockhütte [cm]", y = "Waterlevel Partnach-Ursprung [cm]", color = "Year") +  # Axis labels and legend title
+  theme_minimal(base_size = 14) +  # Minimal theme with a bigger base font size
+  theme(
+    legend.position = "right",  # Position the legend to the right
+    legend.title = element_text(size = 14, face = "normal"),
+    legend.text = element_text(size = 12),
+    axis.title = element_text(size = 14, face = "normal"),
+    axis.text = element_text(size = 12),
+    plot.title = element_text(size = 12, face = "bold", hjust = 0.5)  # Title
+  ) +
+  ggtitle("Plot of average daily waterlevel at Bockhütte and Partnach-Ursprung")
+
+# Convert the ggplot object to a plotly object for interactivity
+interactive_plot <- ggplotly(p, tooltip = "text")  # Tooltip shows the year when hovering over the points
+
+# Display the interactive plot
+interactive_plot
+
+```
+```{r}
+
+# Create the scatterplot with publication-quality formatting
+p <- ggplot(df_combined_00, aes(x = P_D_W_Bock, y = P_D_W_Ursprung, color = factor(Year), 
+                               text = paste("Year: ", Year, "<br>Waterlevel Bockhütte: ", P_D_W_Bock, " cm", 
+                                            "<br>Waterlevel Partnach-Ursprung: ", P_D_W_Ursprung, " cm"))) +
+  geom_point(alpha = 0.7, size = 2) +  # Scatterplot with semi-transparent points
+  scale_colour_brewer(palette = "Dark2") +  # Use a color scale
+  labs(x = "Waterlevel Bockhütte [cm]", y = "Waterlevel Partnach-Ursprung [cm]", color = "Year") +  # Axis labels and legend title
+  theme_minimal(base_size = 14) +  # Minimal theme with a bigger base font size
+  theme(
+    legend.position = "right",  # Position the legend to the right
+    legend.title = element_text(size = 14, face = "normal"),
+    legend.text = element_text(size = 12),
+    axis.title = element_text(size = 14, face = "normal"),
+    axis.text = element_text(size = 12),
+    plot.title = element_text(size = 12, face = "bold", hjust = 0.5)  # Title
+  ) +
+  ggtitle("Plot of average daily waterlevel at Bockhütte and Partnach-Ursprung")
+
+# Convert the ggplot object to a plotly object for interactivity
+interactive_plot <- ggplotly(p, tooltip = "text")  # Tooltip shows the custom information when hovering over the points
 
 # Display the interactive plot
 interactive_plot
