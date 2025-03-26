@@ -15,6 +15,9 @@ GitHub: follow this tutorial for everything else :)
 ```{r}
 # LIBRARIES
 library(dplyr)
+library(lubridate)
+library(ggplot2)
+library(plotly)
 #install.packages("dplyr")
 ```
 
@@ -28,15 +31,7 @@ path_bock = normalizePath("C:\\Users\\Jakob\\OneDrive - Universität Augsburg\\J
 
 ```
 
-## 1. Data Input
-
-```{r}
-# DATA INPUT
-df_ursprung_RAW <- read_and_combine(path_ursprung)
-df_bock_RAW <- read_and_combine(path_bock)
-```
-
-## 2. Functions
+## 1. Functions
 
 ```{r}
 # FUCTIONS
@@ -78,11 +73,13 @@ read_and_combine <- function(base_folder_path) {
 #F2 - Function To clean the dataframes
 
 clean_dataframe <- function(df) {
-  # 0. Ch
+  
+  # 0. Convert NaN to NA
+  df[df == "NaN"] <- NA
+  
   # 1. Set MESS_DATUM to Datetime format
   if ("MESS_DATUM" %in% colnames(df)) {
-    df$MESS_DATUM <- trimws(df$MESS_DATUM)
-    df$MESS_DATUM <- as.POSIXct(df$MESS_DATUM, format = "YYYY-mm-dd HH:MM:SS", tz = "UTC") # Adjust format if necessary
+    df$MESS_DATUM <- strptime(df$MESS_DATUM, format = "%Y-%m-%d %H:%M:%S", tz = "UTC")
   }
   
   # 2. Remove STATIONS_ID Column
@@ -90,10 +87,9 @@ clean_dataframe <- function(df) {
     df <- df[, !colnames(df) %in% "STATIONS_ID"]
   }
   
-  # 3. Convert NaN to NA
-  df[df == "NaN"] <- NA
+
   
-  # 4. Convert specific columns to numeric
+  # 3. Convert specific columns to numeric
   cols_to_convert <- c("Q", "P_R_W", "P_D_W", "T_W", "LF_W")
   
   # Apply conversion to numeric, if the columns exist
@@ -103,7 +99,7 @@ clean_dataframe <- function(df) {
     }
   }
   
-  # 5. Round all numeric columns to 2 decimal places
+  # 4. Round all numeric columns to 2 decimal places
   num_cols <- sapply(df, is.numeric)  # Identify numeric columns
   df[num_cols] <- round(df[num_cols], 2)  # Round numeric columns to 2 decimal places
   
@@ -111,23 +107,188 @@ clean_dataframe <- function(df) {
 }
 ```
 
-## 3. Clean up Dataframes
+
+## 2. Data Input
 
 ```{r}
-# Test
-num_cols = sapply(df_ursprung_RAW, is.numeric)
-print(num_cols)
+# DATA INPUT
+df_ursprung_RAW <- read_and_combine(path_ursprung)
+df_bock_RAW <- read_and_combine(path_bock)
 ```
+
+## 3. Clean up Dataframes
 
 ```{r}
 # Clean Dataframes
 df_ursprung <- clean_dataframe(df_ursprung_RAW)
 df_bock <- clean_dataframe(df_bock_RAW)
 
+```
+## Prepare for Plotting
+```{r}
+# Remove all Years before 2015
+
+# Filter rows where MESS_DATUM is before 2015 using base R
+df_ursprung_00 <- df_ursprung[as.numeric(format(df_ursprung$MESS_DATUM, "%Y")) >= 2015, ]
+df_bock_00 <- df_bock[as.numeric(format(df_bock$MESS_DATUM, "%Y")) >= 2015, ]
+#head(df_bock_00)
+```
+
+```{r}
+# Create Dataframes with daily data
+
+# Extract the date (ignoring time) and group by that
+df_ursprung_01 <- df_ursprung_00 %>%
+  mutate(Date = as.Date(MESS_DATUM)) %>%  # Create a new Date column with only the date part
+  group_by(Date) %>%  # Group by the Date
+  summarize(across(everything(), mean, na.rm = TRUE))  # Calculate mean for all columns, ignoring NA
+
+
+# Extract the date (ignoring time) and group by that
+df_bock_01 <- df_bock_00 %>%
+  mutate(Date = as.Date(MESS_DATUM)) %>%  # Create a new Date column with only the date part
+  group_by(Date) %>%  # Group by the Date
+  summarize(across(everything(), mean, na.rm = TRUE))  # Calculate mean for all columns, ignoring NA
 
 ```
 
-```{}
+```{r}
+# Create a single Dataframe
+
+# Merge the dataframes based on MESS_DATUM, keeping only one MESS_DATUM column
+df_combined_01<- df_ursprung_01 %>%
+  left_join(df_bock_01, by = "MESS_DATUM", suffix = c("_Ursprung", "_Bock"))
+
+# CLEANUP - it got a bit dirty 
+# Remove unwanted columns and rename Date_Ursprung to MESS_DATUM
+df_combined_00 <- df_combined_01 %>%
+  select(-MESS_DATUM,   # Remove the redundant MESS_DATUM from df_bock_01
+         -Date_Bock) %>%      # Remove Date_Bock column
+  rename(MESS_DATUM = Date_Ursprung)  # Rename Date_Ursprung to MESS_DATUM
+
+
 ```
 
-df_ursprung \<- read_and_combine(path_ursprung)
+## Plotting
+
+```{r}
+# Extract Year from MESS_DATUM column and add as a new column
+df_combined_00 <- df_combined_00 %>%
+  mutate(Year = as.numeric(format(MESS_DATUM, "%Y")))  # Extract year as numeric
+
+# Create the scatterplot with publication-quality formatting
+p <- ggplot(df_combined_00, aes(x = Q_Bock, y = Q_Ursprung, color = factor(Year))) +
+  geom_point(alpha = 0.7, size = 2) +  # Scatterplot with semi-transparent points
+  scale_colour_brewer(palette = "Paired") +  # Use a color scale (Viridis is colorblind-friendly)
+  labs(x = "Q Bock", y = "Q Ursprung", color = "Year") +  # Axis labels and legend title
+  theme_minimal(base_size = 14) +  # Minimal theme with a bigger base font size
+  theme(
+    legend.position = "right",  # Position the legend to the right
+    legend.title = element_text(size = 14, face = "bold"),
+    legend.text = element_text(size = 12),
+    axis.title = element_text(size = 14, face = "bold"),
+    axis.text = element_text(size = 12),
+    #panel.grid.major = element_blank(),  # Remove major gridlines
+    #panel.grid.minor = element_blank(),  # Remove minor gridlines
+    plot.title = element_text(size = 16, face = "bold", hjust = 0.5)  # Title
+  ) +
+  ggtitle("Scatter Plot of Q_Bock vs. Q_Ursprung")  # Add a title
+
+# Print the plot
+print(p)
+```
+```{r}
+# Extract Year from MESS_DATUM column and add as a new column
+df_combined_00 <- df_combined_00 %>%
+  mutate(Year = as.numeric(format(MESS_DATUM, "%Y")))  # Extract year as numeric
+
+# Create the scatterplot with publication-quality formatting
+p <- ggplot(df_combined_00, aes(x = Q_Bock, y = Q_Ursprung, color = factor(Year))) +
+  geom_point(alpha = 0.7, size = 2) +  # Scatterplot with semi-transparent points
+  scale_colour_brewer(palette = "Paired") +  # Use a color scale (Viridis is colorblind-friendly)
+  labs(x = "Q Bock", y = "Q Ursprung", color = "Year") +  # Axis labels and legend title
+  theme_minimal(base_size = 14) +  # Minimal theme with a bigger base font size
+  theme(
+    legend.position = "right",  # Position the legend to the right
+    legend.title = element_text(size = 14, face = "bold"),
+    legend.text = element_text(size = 12),
+    axis.title = element_text(size = 14, face = "bold"),
+    axis.text = element_text(size = 12),
+    plot.title = element_text(size = 16, face = "bold", hjust = 0.5)  # Title
+  ) +
+  ggtitle("Scatter Plot of Q_Bock vs. Q_Ursprung") +  # Add a title
+  coord_fixed(ratio = 1)  # Ensure the x and y axes have the same scale
+
+# Print the plot
+print(p)
+```
+
+
+```{r}
+
+# Extract Year from MESS_DATUM column and add as a new column
+df_combined_00 <- df_combined_00 %>%
+  mutate(Year = as.numeric(format(MESS_DATUM, "%Y")))  # Extract year as numeric
+
+# Create the scatterplot with publication-quality formatting
+p <- ggplot(df_combined_00, aes(x = Q_Bock, y = Q_Ursprung, color = factor(Year), text = paste("Year: ", Year))) +
+  geom_point(alpha = 0.7, size = 2) +  # Scatterplot with semi-transparent points
+  scale_colour_brewer(palette = "Paired") +  # Use a color scale
+  labs(x = "Q Bock", y = "Q Ursprung", color = "Year") +  # Axis labels and legend title
+  theme_minimal(base_size = 14) +  # Minimal theme with a bigger base font size
+  theme(
+    legend.position = "right",  # Position the legend to the right
+    legend.title = element_text(size = 14, face = "bold"),
+    legend.text = element_text(size = 12),
+    axis.title = element_text(size = 14, face = "bold"),
+    axis.text = element_text(size = 12),
+    plot.title = element_text(size = 16, face = "bold", hjust = 0.5)  # Title
+  ) +
+  ggtitle("Scatter Plot of Q_Bock vs. Q_Ursprung")
+
+# Convert the ggplot object to a plotly object for interactivity
+interactive_plot <- ggplotly(p, tooltip = "text")  # Tooltip shows the year when hovering over the points
+
+# Display the interactive plot
+interactive_plot
+```
+
+```{r}
+# Load necessary libraries
+library(ggplot2)
+library(dplyr)
+
+# Extract Year from MESS_DATUM column and add as a new column
+df_combined_00 <- df_combined_00 %>%
+  mutate(Year = as.numeric(format(MESS_DATUM, "%Y")))  # Extract year as numeric
+
+# Create the scatterplot with refined customization
+p <- ggplot(df_combined_00, aes(x = Q_Bock, y = Q_Ursprung, color = factor(Year))) +
+  geom_point(alpha = 0.7, size = 2) +  # Scatterplot with smaller points and semi-transparency
+  scale_color_manual(values = RColorBrewer::brewer.pal(n = length(unique(df_combined_00$Year)), name = "Set3")) +  # Discrete color scale
+  labs(x = "Q Bock", y = "Q Ursprung", color = "Year") +  # Axis labels and legend title
+  theme_minimal(base_size = 14) +  # Minimal theme with a bigger base font size
+  theme(
+    legend.position = "right",  # Position the legend to the right
+    legend.title = element_text(size = 14, face = "bold"),
+    legend.text = element_text(size = 12),
+    axis.title = element_text(size = 14, face = "bold"),
+    axis.text = element_text(size = 12),
+    panel.grid.major = element_line(color = "gray", size = 0.5),  # Add gridlines with a light gray color
+    panel.grid.minor = element_line(color = "gray", size = 0.2, linetype = "dotted"),  # Minor gridlines with a dotted line
+    plot.title = element_text(size = 16, face = "bold", hjust = 0.5),  # Title formatting
+    panel.border = element_blank()  # Remove the panel border
+  ) +
+  scale_x_continuous(breaks = seq(min(df_combined_00$Q_Bock, na.rm = TRUE), 
+                                 max(df_combined_00$Q_Bock, na.rm = TRUE), 
+                                 by = (max(df_combined_00$Q_Bock, na.rm = TRUE) - min(df_combined_00$Q_Bock, na.rm = TRUE)) / 5)) +  # Customize x-axis breaks
+  scale_y_continuous(breaks = seq(min(df_combined_00$Q_Ursprung, na.rm = TRUE), 
+                                 max(df_combined_00$Q_Ursprung, na.rm = TRUE), 
+                                 by = (max(df_combined_00$Q_Ursprung, na.rm = TRUE) - min(df_combined_00$Q_Ursprung, na.rm = TRUE)) / 5)) +  # Customize y-axis breaks
+  ggtitle("Scatter Plot of Q_Bock vs. Q_Ursprung")  # Add a title
+
+# Print the plot
+print(p)
+
+```
+
