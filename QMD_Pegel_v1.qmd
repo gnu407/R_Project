@@ -31,7 +31,7 @@ path_bock = normalizePath("C:\\Users\\Jakob\\OneDrive - Universität Augsburg\\J
 
 ```
 
-## 1. Functions
+### 1. Functions
 
 ```{r}
 # FUCTIONS
@@ -108,7 +108,7 @@ clean_dataframe <- function(df) {
 ```
 
 
-## 2. Data Input
+### 2. Data Input
 
 ```{r}
 # DATA INPUT
@@ -116,7 +116,7 @@ df_ursprung_RAW <- read_and_combine(path_ursprung)
 df_bock_RAW <- read_and_combine(path_bock)
 ```
 
-## 3. Clean up Dataframes
+### 3. Clean up Dataframes
 
 ```{r}
 # Clean Dataframes
@@ -124,7 +124,7 @@ df_ursprung <- clean_dataframe(df_ursprung_RAW)
 df_bock <- clean_dataframe(df_bock_RAW)
 
 ```
-## Prepare for Plotting
+## Q and Waterlevel Relationship
 ```{r}
 # Remove all Years before 2015
 
@@ -166,13 +166,18 @@ df_combined_00 <- df_combined_01 %>%
          -MESS_DATUM_Bock) %>%      # Remove Date_Bock column
   rename(MESS_DATUM = Date)  # Rename Date_Ursprung to MESS_DATUM
 
-# Round to 3 decimal places
-df_combined_00[num_cols] <- round(df_combined_00[num_cols], 3)  # Round numeric columns to 2 decimal places
+# Round to 2 decimal places
+
+# Identify numeric columns except the first column (assuming MESS_DATUM is the first column)
+num_cols <- sapply(df_combined_00, is.numeric)  # Identify numeric columns
+num_cols[1] <- FALSE  # Exclude the first column (MESS_DATUM or any other non-numeric column)
+
+df_combined_00[num_cols] <- round(df_combined_00[num_cols], 2)  # Round numeric columns to 2 decimal places
   
 
 ```
 
-## Plotting
+### Plots daily Q and Waterlevel
 
 LEGACY
 // Extract Year from MESS_DATUM column and add as a new column
@@ -233,37 +238,7 @@ interactive_plot <- ggplotly(p, tooltip = "text")  # Tooltip shows the year when
 interactive_plot
 ```
 
-```{r}
 
-# PLOT - WATERLEVEL
-# Extract Year from MESS_DATUM column and add as a new column
-df_combined_00 <- df_combined_00 %>%
-  mutate(Year = as.numeric(format(MESS_DATUM, "%Y")))  # Extract year as numeric
-
-# Create the scatterplot with publication-quality formatting
-p <- ggplot(df_combined_00, aes(x = P_D_W_Bock, y = P_D_W_Ursprung, color = factor(Year), text = paste("Year: ", Year, "<br>Q Bockhütte: ", Q_Bock, " m³", 
-                                            "<br>Q Partnach-Ursprung: ", Q_Ursprung, " m³"))) +
-  geom_point(alpha = 0.7, size = 2) +  # Scatterplot with semi-transparent points
-  scale_colour_brewer(palette = "Dark2") +  # Use a color scale
-  labs(x = "Waterlevel Bockhütte [cm]", y = "Waterlevel Partnach-Ursprung [cm]", color = "Year") +  # Axis labels and legend title
-  theme_minimal(base_size = 14) +  # Minimal theme with a bigger base font size
-  theme(
-    legend.position = "right",  # Position the legend to the right
-    legend.title = element_text(size = 14, face = "normal"),
-    legend.text = element_text(size = 12),
-    axis.title = element_text(size = 14, face = "normal"),
-    axis.text = element_text(size = 12),
-    plot.title = element_text(size = 12, face = "bold", hjust = 0.5)  # Title
-  ) +
-  ggtitle("Plot of average daily waterlevel at Bockhütte and Partnach-Ursprung")
-
-# Convert the ggplot object to a plotly object for interactivity
-interactive_plot <- ggplotly(p, tooltip = "text")  # Tooltip shows the year when hovering over the points
-
-# Display the interactive plot
-interactive_plot
-
-```
 ```{r}
 
 # Create the scatterplot with publication-quality formatting
@@ -291,42 +266,89 @@ interactive_plot <- ggplotly(p, tooltip = "text")  # Tooltip shows the custom in
 interactive_plot
 ```
 
-```{r}
-# Load necessary libraries
-library(ggplot2)
-library(dplyr)
+## Histograms of Daily Q and Waterlevel
 
-# Extract Year from MESS_DATUM column and add as a new column
+### Bockhütte
+
+#### Q 
+
+
+```{r}
+
+# UNFINISHED
+
+# Assuming df_combined_00 is your dataframe
+
+# Create a new column to extract year for faceting
 df_combined_00 <- df_combined_00 %>%
   mutate(Year = as.numeric(format(MESS_DATUM, "%Y")))  # Extract year as numeric
 
-# Create the scatterplot with refined customization
-p <- ggplot(df_combined_00, aes(x = Q_Bock, y = Q_Ursprung, color = factor(Year))) +
-  geom_point(alpha = 0.7, size = 2) +  # Scatterplot with smaller points and semi-transparency
-  scale_color_manual(values = RColorBrewer::brewer.pal(n = length(unique(df_combined_00$Year)), name = "Set3")) +  # Discrete color scale
-  labs(x = "Q Bock", y = "Q Ursprung", color = "Year") +  # Axis labels and legend title
-  theme_minimal(base_size = 14) +  # Minimal theme with a bigger base font size
+# Calculate overall statistics for Q_Bock (mean, median, std) by year
+stats_by_year <- df_combined_00 %>%
+  group_by(Year) %>%
+  summarise(
+    mean_QBock = mean(Q_Bock, na.rm = TRUE),
+    median_QBock = median(Q_Bock, na.rm = TRUE),
+    std_QBock = sd(Q_Bock, na.rm = TRUE)
+  )
+
+# Filter out years without any data
+df_combined_00 <- df_combined_00 %>% 
+  filter(!is.na(Q_Bock))  # Remove rows where Q_Bock is NA
+
+# Create the histogram plot
+p <- ggplot(df_combined_00, aes(x = Q_Bock)) +
+  
+  # Layer 1: Overall histogram of Q_Bock
+  geom_histogram(binwidth = 0.5, fill = "skyblue", color = "black", alpha = 0.7, aes(y = ..density..)) +
+  
+  # Add vertical lines for mean, median, and std
+  geom_vline(aes(xintercept = mean(Q_Bock, na.rm = TRUE)), color = "red", linetype = "dashed", size = 1) +
+  geom_vline(aes(xintercept = median(Q_Bock, na.rm = TRUE)), color = "green", linetype = "dashed", size = 1) +
+  geom_vline(aes(xintercept = mean(Q_Bock, na.rm = TRUE) + sd(Q_Bock, na.rm = TRUE)), color = "blue", linetype = "dotted", size = 1) +
+  geom_vline(aes(xintercept = mean(Q_Bock, na.rm = TRUE) - sd(Q_Bock, na.rm = TRUE)), color = "blue", linetype = "dotted", size = 1) +
+  
+  # Layer 2: Facet smaller histograms by Year (faceting by Year)
+  geom_histogram(data = df_combined_00, aes(x = Q_Bock, y = ..density..), 
+                 binwidth = 0.5, fill = "lightgrey", color = "black", alpha = 0.5) +
+  
+  # Customize the x-axis limit (fixed to be between 0 and the max Q_Bock value)
+  scale_x_continuous(limits = c(0, max(df_combined_00$Q_Bock, na.rm = TRUE))) +
+  
+  # Faceting by Year
+  facet_wrap(~ Year, scales = "free_y", ncol = 2) +
+  
+  # Labels and theme
+  labs(x = "Discharge Bock [m³]", y = "Density", title = "Histogram of discharge at Bockhütte ") +
+  
+  # Customize the theme for a clean, scientific look
+  theme_minimal(base_size = 14) +
   theme(
-    legend.position = "right",  # Position the legend to the right
-    legend.title = element_text(size = 14, face = "bold"),
-    legend.text = element_text(size = 12),
+    strip.text = element_text(size = 12, face = "bold"),  # Facet labels
     axis.title = element_text(size = 14, face = "bold"),
     axis.text = element_text(size = 12),
-    panel.grid.major = element_line(color = "gray", size = 0.5),  # Add gridlines with a light gray color
-    panel.grid.minor = element_line(color = "gray", size = 0.2, linetype = "dotted"),  # Minor gridlines with a dotted line
-    plot.title = element_text(size = 16, face = "bold", hjust = 0.5),  # Title formatting
-    panel.border = element_blank()  # Remove the panel border
+    legend.position = "none",  # Remove legend
+    plot.title = element_text(size = 16, face = "bold", hjust = 0.5),
+    panel.grid.major = element_line(color = "gray", size = 0.2),  # Add gridlines
+    panel.grid.minor = element_blank()  # Remove minor gridlines
   ) +
-  scale_x_continuous(breaks = seq(min(df_combined_00$Q_Bock, na.rm = TRUE), 
-                                 max(df_combined_00$Q_Bock, na.rm = TRUE), 
-                                 by = (max(df_combined_00$Q_Bock, na.rm = TRUE) - min(df_combined_00$Q_Bock, na.rm = TRUE)) / 5)) +  # Customize x-axis breaks
-  scale_y_continuous(breaks = seq(min(df_combined_00$Q_Ursprung, na.rm = TRUE), 
-                                 max(df_combined_00$Q_Ursprung, na.rm = TRUE), 
-                                 by = (max(df_combined_00$Q_Ursprung, na.rm = TRUE) - min(df_combined_00$Q_Ursprung, na.rm = TRUE)) / 5)) +  # Customize y-axis breaks
-  ggtitle("Scatter Plot of Q_Bock vs. Q_Ursprung")  # Add a title
+  
+  # Add text boxes for mean, median, and std (in a clean box layout)
+  geom_text(data = stats_by_year, aes(x = mean_QBock, y = 0.02, 
+                                      label = paste("Mean: ", round(mean_QBock, 2), 
+                                                    "\nMedian: ", round(median_QBock, 2), 
+                                                    "\nStd: ", round(std_QBock, 2))),
+            color = "black", size = 3, hjust = 0, vjust = 0, 
+            inherit.aes = FALSE) +
+  
+  # Add box around the text
+  geom_rect(data = stats_by_year, aes(xmin = mean_QBock - 0.5, xmax = mean_QBock + 1.5, 
+                                      ymin = 0, ymax = 0.1), fill = "white", 
+            color = "black", size = 0.5, inherit.aes = FALSE)
 
 # Print the plot
 print(p)
+
 
 ```
 
