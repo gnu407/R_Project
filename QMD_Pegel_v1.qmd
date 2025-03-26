@@ -107,7 +107,6 @@ clean_dataframe <- function(df) {
 }
 ```
 
-
 ### 2. Data Input
 
 ```{r}
@@ -124,7 +123,9 @@ df_ursprung <- clean_dataframe(df_ursprung_RAW)
 df_bock <- clean_dataframe(df_bock_RAW)
 
 ```
+
 ## Q and Waterlevel Relationship
+
 ```{r}
 # Remove all Years before 2015
 
@@ -179,34 +180,11 @@ df_combined_00[num_cols] <- round(df_combined_00[num_cols], 2)  # Round numeric 
 
 ### Plots daily Q and Waterlevel
 
-LEGACY
-// Extract Year from MESS_DATUM column and add as a new column
-df_combined_00 <- df_combined_00 %>%
-  mutate(Year = as.numeric(format(MESS_DATUM, "%Y")))  # Extract year as numeric
+LEGACY // Extract Year from MESS_DATUM column and add as a new column df_combined_00 \<- df_combined_00 %\>% mutate(Year = as.numeric(format(MESS_DATUM, "%Y"))) \# Extract year as numeric
 
-//Create the scatterplot with publication-quality formatting
-p <- ggplot(df_combined_00, aes(x = Q_Bock, y = Q_Ursprung, color = factor(Year))) +
-  geom_point(alpha = 0.7, size = 2) +  # Scatterplot with semi-transparent points
-  scale_colour_brewer(palette = "Paired") +  # Use a color scale (Viridis is colorblind-friendly)
-  labs(x = "Q Bock", y = "Q Ursprung", color = "Year") +  # Axis labels and legend title
-  theme_minimal(base_size = 14) +  # Minimal theme with a bigger base font size
-  theme(
-    legend.position = "right",  # Position the legend to the right
-    legend.title = element_text(size = 14, face = "bold"),
-    legend.text = element_text(size = 12),
-    axis.title = element_text(size = 14, face = "bold"),
-    axis.text = element_text(size = 12),
-    #panel.grid.major = element_blank(),  # Remove major gridlines
-    #panel.grid.minor = element_blank(),  # Remove minor gridlines
-    plot.title = element_text(size = 16, face = "bold", hjust = 0.5)  # Title
-  ) +
-  ggtitle("Scatter Plot of Q_Bock vs. Q_Ursprung")  # Add a title
+//Create the scatterplot with publication-quality formatting p \<- ggplot(df_combined_00, aes(x = Q_Bock, y = Q_Ursprung, color = factor(Year))) + geom_point(alpha = 0.7, size = 2) + \# Scatterplot with semi-transparent points scale_colour_brewer(palette = "Paired") + \# Use a color scale (Viridis is colorblind-friendly) labs(x = "Q Bock", y = "Q Ursprung", color = "Year") + \# Axis labels and legend title theme_minimal(base_size = 14) + \# Minimal theme with a bigger base font size theme( legend.position = "right", \# Position the legend to the right legend.title = element_text(size = 14, face = "bold"), legend.text = element_text(size = 12), axis.title = element_text(size = 14, face = "bold"), axis.text = element_text(size = 12), #panel.grid.major = element_blank(), \# Remove major gridlines #panel.grid.minor = element_blank(), \# Remove minor gridlines plot.title = element_text(size = 16, face = "bold", hjust = 0.5) \# Title ) + ggtitle("Scatter Plot of Q_Bock vs. Q_Ursprung") \# Add a title
 
-// Print the plot
-print(p)
-
-
-
+// Print the plot print(p)
 
 ```{r}
 # PLOT - DISCHARGE
@@ -237,7 +215,6 @@ interactive_plot <- ggplotly(p, tooltip = "text")  # Tooltip shows the year when
 # Display the interactive plot
 interactive_plot
 ```
-
 
 ```{r}
 
@@ -270,8 +247,7 @@ interactive_plot
 
 ### Bockhütte
 
-#### Q 
-
+#### Q - TEST
 
 ```{r}
 
@@ -352,3 +328,175 @@ print(p)
 
 ```
 
+# Regression
+
+## Q regression for all Years
+
+```{r}
+# Clean dataframa of NAs
+# Remove rows with missing values or invalid Q_Ursprung (<= 0)
+df_combined_02 <- df_combined_00[!is.na(df_combined_00$Q_Ursprung) & df_combined_00$Q_Ursprung > 0 & !is.na(df_combined_00$Q_Bock), ]
+```
+
+
+```{r}
+# Assuming your data is in a DataFrame called 'df_combined_00' with columns 'Year', 'Q_Ursprung', and 'Q_Bock'
+
+# Step 1: Perform a linear regression for each year
+linear_models <- df_combined_00 %>%
+  group_by(Year) %>%
+  do(model = lm(Q_Bock ~ Q_Ursprung, data = .))
+
+# Step 2: Extract the coefficients and create a new data frame with the results
+model_summary <- linear_models %>%
+  summarise(Year = Year,
+            Intercept = coef(model)[1],
+            Slope = coef(model)[2])
+
+# View the regression results for each year
+print(model_summary)
+
+# Step 3: Generate predicted values for plotting
+df_combined_00 <- df_combined_00 %>%
+  left_join(model_summary, by = "Year") %>%
+  mutate(Q_Bock_pred = Intercept + Slope * Q_Ursprung)
+
+# Step 4: Plot the data and the linear regression lines for each year
+ggplot(df_combined_00, aes(x = Q_Ursprung, y = Q_Bock)) +
+  geom_point(aes(color = as.factor(Year)), size = 3) +  # Scatter plot with color by year
+  geom_abline(aes(intercept = Intercept, slope = Slope, color = as.factor(Year)), linetype = "solid") +  # Linear regression lines
+  labs(title = "Linear Regression Between Q_Ursprung and Q_Bock for Each Year",
+       x = "Q_Ursprung",
+       y = "Q_Bock",
+       color = "Year") +
+  theme_minimal() +
+  theme(legend.position = "bottom")
+```
+
+
+```{r}
+# Assuming your data is in a DataFrame called 'df_combined_00' with columns 'Year', 'Q_Ursprung', and 'Q_Bock'
+
+# Step 1: Fit a logarithmic regression model for each year with Q_Bock as the independent variable
+log_models <- df_combined_02 %>%
+  group_by(Year) %>%
+  do(model = lm(Q_Ursprung ~ log(Q_Bock), data = .))
+
+# Step 2: Extract coefficients (Intercept and Slope) from each model
+log_model_summary <- log_models %>%
+  summarise(Year = Year,
+            Intercept = coef(model)[1],
+            Slope = coef(model)[2])
+
+# Step 3: Merge the model coefficients back into the original data
+df_combined_02 <- df_combined_02 %>%
+  left_join(log_model_summary, by = "Year")
+
+# Step 4: Generate predicted values for Q_Ursprung using the logarithmic model for each year
+#df_combined_02 <- df_combined_02 %>%
+#  mutate(Q_Ursprung_pred = Intercept + Slope * log(Q_Bock))
+
+# Step 5: Plot the data and the logarithmic regression lines for each year using ggplot2
+p <- ggplot(df_combined_02, aes(x = Q_Bock, y = Q_Ursprung)) +
+  geom_point(aes(color = as.factor(Year)), size = 2) +  # Scatter plot with color by year
+  geom_line(aes(y = Q_Ursprung_pred, color = as.factor(Year)), linetype = "solid") +  # Logarithmic regression lines
+  labs(title = "Logarithmic Regression Between Q_Bock and Q_Ursprung for Each Year",
+       x = "Q_Bock",
+       y = "Q_Ursprung",
+       color = "Year") +
+  theme_minimal() +
+  theme(legend.position = "bottom")
+
+# Step 6: Convert the ggplot to an interactive plotly plot
+interactive_plot <- ggplotly(p)
+
+# Step 7: Add regression line labels
+# interactive_plot <- interactive_plot %>%
+#   layout(
+#     annotations = lapply(unique(df_combined_02$Year), function(year) {
+#       slope <- log_model_summary$Slope[log_model_summary$Year == year]
+#       intercept <- log_model_summary$Intercept[log_model_summary$Year == year]
+#       list(
+#         x = max(df_combined_02$Q_Bock) * 0.9,  # Position the label slightly inside the plot
+#         y = intercept + slope * log(max(df_combined_02$Q_Bock) * 0.9),  # Calculate y based on the regression formula
+#         text = paste("y =", round(intercept, 2), "+", round(slope, 2), "* log(x)"),
+#         showarrow = TRUE,
+#         arrowhead = 2,
+#         ax = 20,  # Position offset for the arrow
+#         ay = -20, # Position offset for the arrow
+#         font = list(size = 12)
+#       )
+#     })
+#   )
+
+# Step 8: Show the interactive plot
+interactive_plot
+```
+
+
+## Waterlevel regression for all Years
+
+```{r}
+# Assuming your data is in a DataFrame called 'df_combined_02' with columns 'Year', 'P_D_W_Ursprung', and 'P_D_W_Bock'
+
+# Step 1: Fit a logarithmic regression model for each year with P_D_W_Bock as the independent variable
+log_models <- df_combined_02 %>%
+  group_by(Year) %>%
+  do(model = lm(P_D_W_Ursprung ~ log(P_D_W_Bock), data = .))
+
+# Step 2: Extract coefficients (Intercept and Slope) from each model
+log_model_summary <- log_models %>%
+  summarise(Year = Year,
+            Intercept = coef(model)[1],
+            Slope = coef(model)[2])
+
+# Step 3: Merge the model coefficients back into the original data
+df_combined_02 <- df_combined_02 %>%
+  left_join(log_model_summary, by = "Year")
+
+# Step 4: Generate predicted values for P_D_W_Ursprung using the logarithmic model for each year
+df_combined_02 <- df_combined_02 %>%
+  mutate(P_D_W_Ursprung_pred = Intercept + Slope * log(P_D_W_Bock))
+
+# Step 5: Plot the data and the logarithmic regression lines for each year using ggplot2
+p <- ggplot(df_combined_02, aes(x = P_D_W_Bock, y = P_D_W_Ursprung)) +
+  geom_point(aes(color = as.factor(Year)), size = 2) +  # Scatter plot with color by year
+  geom_line(aes(y = P_D_W_Ursprung_pred, color = as.factor(Year)), linetype = "solid") +  # Logarithmic regression lines
+  labs(title = "Logarithmic Regression Between P_D_W_Bock and P_D_W_Ursprung for Each Year",
+       x = "P_D_W_Bock",
+       y = "P_D_W_Ursprung",
+       color = "Year") +
+  theme_minimal() +
+  theme(legend.position = "bottom")
+
+# Step 6: Convert the ggplot to an interactive plotly plot
+interactive_plot <- ggplotly(p)
+
+# # Step 7: Add regression line formulas as annotations (labels for each year)
+# regression_texts <- lapply(unique(df_combined_02$Year), function(year) {
+#   slope <- log_model_summary$Slope[log_model_summary$Year == year]
+#   intercept <- log_model_summary$Intercept[log_model_summary$Year == year]
+#   formula_text <- paste("y =", round(intercept, 2), "+", round(slope, 2), "* log(x)")
+#   
+#   list(
+#     x = max(df_combined_02$P_D_W_Bock) * 0.9,  # Position the label slightly inside the plot
+#     y = intercept + slope * log(max(df_combined_02$P_D_W_Bock) * 0.9),  # Calculate y based on the regression formula
+#     text = formula_text,
+#     showarrow = TRUE,
+#     arrowhead = 2,
+#     ax = 20,  # Position offset for the arrow
+#     ay = -20, # Position offset for the arrow
+#     font = list(size = 12)
+#   )
+# })
+# 
+# # Step 8: Update plot to include custom annotations for regression formulas
+# interactive_plot <- interactive_plot %>%
+#   layout(
+#     annotations = regression_texts,
+#     showlegend = FALSE  # Hide the legend, since we are adding custom annotations for formulas
+#   )
+
+# Step 9: Show the interactive plot
+interactive_plot
+```
