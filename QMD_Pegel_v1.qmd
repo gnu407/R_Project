@@ -22,7 +22,9 @@ library(dplyr)
 
 ```{r}
 # CONFIG
-path_ursprung =normalizePath("C:\\Users\\Jakob\\OneDrive - Universität Augsburg\\Job Uni\\G-MONARCH\\ONGOING\\Elias_PegelOffset_2025\\R_Projekt\\R_Project\\Daten\\Datensatz_Partnach_v1\\Partnach_Ursprung\\Abflüsse_nach_Jahren")
+path_ursprung = normalizePath("C:\\Users\\Jakob\\OneDrive - Universität Augsburg\\Job Uni\\G-MONARCH\\ONGOING\\Elias_PegelOffset_2025\\Datensatz_Partnach_v1\\Partnach_Ursprung\\Abflüsse_nach_Jahren")
+
+path_bock = normalizePath("C:\\Users\\Jakob\\OneDrive - Universität Augsburg\\Job Uni\\G-MONARCH\\ONGOING\\Elias_PegelOffset_2025\\Datensatz_Partnach_v1\\Partnach_Bockhütte\\Abflüsse_nach_Jahren")
 
 ```
 
@@ -30,7 +32,8 @@ path_ursprung =normalizePath("C:\\Users\\Jakob\\OneDrive - Universität Augsburg
 
 ```{r}
 # DATA INPUT
-df_ursprung <- read_and_combine(path_ursprung)
+df_ursprung_RAW <- read_and_combine(path_ursprung)
+df_bock_RAW <- read_and_combine(path_bock)
 ```
 
 ## 2. Functions
@@ -50,7 +53,7 @@ read_and_combine <- function(base_folder_path) {
   
   # Read and standardize the columns before binding
   df_list <- lapply(files, function(file) {
-    df <- read.csv(file)
+    df <- read.csv(normalizePath(file))
     
     # Ensure that all columns exist and convert all to character for consistency
     df[] <- lapply(df, function(col) {
@@ -72,17 +75,59 @@ read_and_combine <- function(base_folder_path) {
   return(combined_df)
 }
 
-#F2
+#F2 - Function To clean the dataframes
+
+clean_dataframe <- function(df) {
+  # 0. Ch
+  # 1. Set MESS_DATUM to Datetime format
+  if ("MESS_DATUM" %in% colnames(df)) {
+    df$MESS_DATUM <- trimws(df$MESS_DATUM)
+    df$MESS_DATUM <- as.POSIXct(df$MESS_DATUM, format = "YYYY-mm-dd HH:MM:SS", tz = "UTC") # Adjust format if necessary
+  }
+  
+  # 2. Remove STATIONS_ID Column
+  if ("STATIONS_ID" %in% colnames(df)) {
+    df <- df[, !colnames(df) %in% "STATIONS_ID"]
+  }
+  
+  # 3. Convert NaN to NA
+  df[df == "NaN"] <- NA
+  
+  # 4. Convert specific columns to numeric
+  cols_to_convert <- c("Q", "P_R_W", "P_D_W", "T_W", "LF_W")
+  
+  # Apply conversion to numeric, if the columns exist
+  for (col in cols_to_convert) {
+    if (col %in% colnames(df)) {
+      df[[col]] <- as.numeric(df[[col]])
+    }
+  }
+  
+  # 5. Round all numeric columns to 2 decimal places
+  num_cols <- sapply(df, is.numeric)  # Identify numeric columns
+  df[num_cols] <- round(df[num_cols], 2)  # Round numeric columns to 2 decimal places
+  
+  return(df)
+}
+```
+
+## 3. Clean up Dataframes
+
+```{r}
+# Test
+num_cols = sapply(df_ursprung_RAW, is.numeric)
+print(num_cols)
 ```
 
 ```{r}
+# Clean Dataframes
+df_ursprung <- clean_dataframe(df_ursprung_RAW)
+df_bock <- clean_dataframe(df_bock_RAW)
 
-df_ursprung
 
 ```
 
-```{r}
-df_ursprung <- read_and_combine(path_ursprung)
+```{}
 ```
 
 df_ursprung \<- read_and_combine(path_ursprung)
